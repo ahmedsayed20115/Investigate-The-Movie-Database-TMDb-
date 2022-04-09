@@ -1,129 +1,353 @@
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
+<a id='intro'></a>
+## Introduction
 
-# C extensions
-*.so
+### Dataset Description >The Movie Database (TMDb)
 
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-pip-wheel-metadata/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
 
-# PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
-*.manifest
-*.spec
+>The Movie Database (TMDb) contains many important informations such as  ( director, production company, budget, genres , cast) and how viewers acted to the movie on the site  on thousands of movies that were released from 1960 to 2015
 
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
+In this project, I will analyze a dataset provided by TMDb and investigate its data points to assess the properties that are associated with highly popular movies. First, I will clean the data, then I will provide various visualizations through Matplotlib to identify patterns in the data. 
+In this project , at first i will fix any corrupted data or any missing values and then exploring the data set to getgood informations that will help movies makers to select the best director or the pest type of movie to achive the best profit
 
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
+### Question(s) for Analysis
+>**Tip**: Ther is many questions we can answer by analsing the data such as : 
+   The Director who makes most movies
+   The director who has the most popularity
+   The director who has the best vote_average
+   The relationship betwwen runtime and popularity .
+   Who are the 25 most directors who needs bigest budget
+   Who are the 25 most directors who achive best profit
+   What genre is most popular
+   What genre is the best by vote average
+   What genre makes best profit
 
-# Translations
-*.mo
-*.pot
 
-# Django stuff:
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
+import pandas as pd
+import numpy as np 
+import matplotlib.pyplot as plt 
+%matplotlib inline
+import imdb 
+from imdb import IMDb 
 
-# Flask stuff:
-instance/
-.webassets-cache
+<a id='wrangling'></a>
+## Data Wrangling
+In This Section I will Load The data and exploring its porperties
 
-# Scrapy stuff:
-.scrapy
+df=pd.read_csv("tmdb-movies.csv")
+df.head(3)
+df['release_year'].max()
 
-# Sphinx documentation
-docs/_build/
+### Data Cleaning
+In this Section i will clean and fix the data from duplicated rows  null values or wrong datatype 
+Filtter duplicated rowes 
+#Check For Duplicated Rows
+sum(df.duplicated())
+#Delet Duplicated Data
+df.drop_duplicates(inplace=True)
 
-# PyBuilder
-target/
+#Reheck For Duplicated Rows
+sum(df.duplicated())
+Delet Unnecessary columns ( revenue , tagline , keywords ,release_date, homepage , overview, )
 
-# Jupyter Notebook
-.ipynb_checkpoints
+df.drop( ['budget', 'revenue', 'tagline', 'keywords', 'homepage'  , 'overview' , 'release_date' ] , axis=1, inplace=True)
 
-# IPython
-profile_default/
-ipython_config.py
+df.info()
+Fixing data of imdb_id
+df['imdb_id']=df.imdb_id.str.extract('(\d+)')
+df['imdb_id']
+Fixing data for cast
+df['cast'] = df['cast'] = df['cast'].str.split('|')
+df['cast']
+Fixing data for genres
+df['genres'] = df['genres'] = df['genres'].str.split('|')
+df['genres']
+Fixing data for production_companies
+ 
+df['production_companies'] = df['production_companies'] = df['production_companies'].str.split('|')
+df['production_companies']
+### Fixing Null Values
+Fixing Null Values For imdb_id
+df_imdb_id =df[df['imdb_id'].isnull()==True]
+li_title = df_imdb_id['original_title'].to_list()
+imdb_id = []
+ia = IMDb()
+for title in li_title :
+    movie_title = ia.search_movie(title)
+    movie_title=str(movie_title)
+    title_id= movie_title[movie_title.index(':')+1:movie_title.index('[',1)]
+    imdb_id.append(title_id)
 
-# pyenv
-.python-version
+df_imdb_id['imdb_id'] = imdb_id
+df = df.dropna(axis=0 , subset=['imdb_id'])
+df = df.append(df_imdb_id) 
 
-# pipenv
-#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
-#   However, in case of collaboration, if having platform-specific dependencies or dependencies
-#   having no cross-platform support, pipenv may install dependencies that don't work, or not
-#   install all needed dependencies.
-#Pipfile.lock
+df.info()
+Fixing Null Values For Director
+df_director = df[df['director'].isnull()==True]
+movie_director =[]
+li_dir_id = df_director['imdb_id'].to_list()
+for dr in li_dir_id:
+    try :
+        #Get The Movie
+        movie = ia.get_movie(dr)
+        #Get Director
+        mo_direc =str(movie['director'])
+        mo_direc = mo_direc[mo_direc.index('_')+1:mo_direc.index('_>')]
+        movie_director.append(mo_direc)
 
-# PEP 582; used by e.g. github.com/David-OConnor/pyflow
-__pypackages__/
+    except:
+        movie_director.append("-")
 
-# Celery stuff
-celerybeat-schedule
-celerybeat.pid
+df_director['director'] = movie_director
 
-# SageMath parsed files
-*.sage.py
+df = df.dropna(axis=0 , subset=['director'])
+df = df.append(df_director) 
 
-# Environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
+df.info()
+Fixing Null Values For Cast
+df_cast = df[df['cast'].isnull()==True]
+movies_cast = []
 
-# Spyder project settings
-.spyderproject
-.spyproject
+li_cast_id = df_cast['imdb_id'].to_list()
 
-# Rope project settings
-.ropeproject
+for ca in li_cast_id:
+        
+        try :
+                #Get The Movie
+                movie = ia.get_movie(ca)
+                #Get Cast
+                mo_ca = movie['cast'] 
+                movie_cast =[]    
+                for act in mo_ca  :
+                        
+                        if len(movie_cast) < 5:
+                                actor = str(act)
+                                movie_cast.append(actor)
+                        else:
+                                break                
+                movies_cast.append(movie_cast)
+        except : 
+                movies_cast.append('-')
+        
+                
+df_cast['cast']=movies_cast
+df = df.dropna(axis=0 , subset=['cast'])
+df = df.append(df_cast) 
+df.info()
+Fixing Null Values For Genres
+df_genres = df[df['genres'].isnull()==True]
+movies_genres = []
+li_gen_id = df_genres['imdb_id'].to_list()
 
-# mkdocs documentation
-/site
+for gen in li_gen_id:
+        #Get The Movie
+        try : 
+                movie = ia.get_movie(gen)
+                #Get Cast
+                mo_gen = movie['genres']                   
+                movies_genres.append(mo_gen)
+        except : 
+                movies_genres.append('-')
+                
+df_genres['genres']=movies_genres
+df = df.dropna(axis=0 , subset=['genres'])
+df = df.append(df_genres) 
+df.info()
+Fixing Null Values For Production Companies
+df_company = df[df['production_companies'].isnull()==True]
+movies_companies = []
 
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
+li_com_id = df_company['imdb_id'].to_list()
+for com in li_com_id:
+        #Get The Movie
+        try :
+                movie = ia.get_movie(com)
+                #Get Cast
+                mo_com = movie['production companies']
+                movie_companies =[]     
+                for company in mo_com  :
+                      
+                        one_com = str(company)
+                        movie_companies.append(one_com )
+                        
+                                             
+                movies_companies.append(movie_companies)
+        except : 
+                movies_companies.append('-')
+                
+df_company['production_companies']=movies_companies
+df = df.dropna(axis=0 , subset=['production_companies'])
+df = df.append(df_company) 
+df.info()
+#### Creat A column With profit by each movie
+df_profit = df['revenue_adj']-df['budget_adj']
+df_profit
+df = pd.concat([df , df_profit] , axis = 1)
+df.rename(columns = {0:'profit'}, inplace=True)
+df.info()
+Creat df_gener as a DataFrame with column genre with value of one genre for each movie
+# Creat df_gener DataFram
+df_gener = df['genres'].apply(pd.Series)
 
-# Pyre type checker
-.pyre/
+
+df_gener
+df_gener=df.merge(df_gener, left_index=True, right_index = True)
+df_gener.head(2)
+#Creat column genre
+df_gener=df_gener.melt(id_vars=['id' ,'imdb_id','popularity','original_title','cast','director','runtime','genres','production_companies','vote_count','vote_average','release_year','budget_adj' , 'revenue_adj' , 'profit'],value_name="genre")
+df_gener.head(2)
+#Filter df_gener DataFram
+df_gener.drop(['variable'],axis=1,inplace=True)
+df_gener.dropna(inplace=True)
+df_gener.info()
+<a id='eda'></a>
+## Exploratory Data Analysis
+
+In this section i will explore the data to Answer diffrent quetions 
+
+
+### Who are the 25 most directors who directed most movies
+mov_dic = df['director'].value_counts()
+directors =  df['director'].value_counts().index[:25]
+movies = mov_dic.head(25).to_list()
+locations = directors
+heights = movies
+plt.bar(locations, heights  )
+plt.title('Number of Movies by director for highiest 25 directors')
+plt.xlabel('Directors')
+plt.xticks(rotation=90)
+plt.ylabel('Number of movies');
+
+this figure showes the top 25 director who directed the most movies in  last few decades 
+### Creat A function to visualize a bar between two columns
+def bar_chart(x , y) :
+    y_axis = df.groupby(x)[y].mean().sort_values(ascending=False).head(25)
+    x_axis =y_axis.index[:25]
+
+    locations = x_axis
+    heights = y_axis
+    plt.bar(locations, heights  )
+    char_title = 'Mean of {}  by {} for highiest 25 {}'.format(y,x,x)
+    plt.title(char_title)
+    plt.xlabel(x)
+    plt.xticks(rotation=90)
+    y_lable = 'Mean of {}'.format(y)
+    plt.ylabel(y_lable);
+###  Who are the 25 most directors who directed most popular movies
+bar_chart('director' , 'popularity')
+if you want to make a movie and want it's popularity to be height you should work with one of these best 25 directors as thir movies achived the best popularity score for the last few decades
+###  Who are the 25 most directors who directed best movies by vote_average
+bar_chart('director','vote_average')
+ The vote average showes the opinion of peaple on the movie so if you want the movie to be successful you should work with one of  T the best 25 directors who achived the best mean of vote average 
+###  Who are the 25 most directors who needs bigest budget
+bar_chart('director','budget_adj')
+If you want to hire a director you should first compaire between your budget and the mean budget that the director work with
+###  Who are the 25 most directors who achive best profit
+bar_chart('director' , 'profit')
+The biggest reason to make a movie is to make a profit and the good movie will make a good profit so you should explore this figure to decide the director that you should hire
+### Creat a function to drow scotterplot with two columns  
+def scatt(x , y) :
+    df.plot(x=x,y=y,kind='scatter'   )
+    sc_title = '{} VS {}'.format(x,y)
+    plt.title(sc_title)
+    plt.xticks(np.arange(0,900,100))
+    plt.show()
+### Relationship between runtime & popularity
+scatt('runtime' , 'vote_average')
+To make a good movie you shold first decide how long the movie will be
+### Relationship between runtime & popularity
+scatt('runtime' , 'popularity')
+This figure will show you that the movies with run time between (100:200) has the highest popularity
+### What genre is most popular
+mean_popularity_genre = df_gener.groupby('genre')['popularity'].mean().sort_values(ascending=False).head(25)
+genre_popularity = mean_popularity_genre.index[:25]
+locations = genre_popularity
+heights = mean_popularity_genre
+plt.bar(locations, heights  )
+plt.title('Mean popularity by genre')
+plt.xlabel('Genres')
+plt.xticks(rotation=90)
+plt.ylabel('Mean popularity');
+This figure shows you the most popular genre to decide what kind of the move you should make 
+### What genre is the best by vote average
+mean_vote_average_genre = df_gener.groupby('genre')['vote_average'].mean().sort_values(ascending=False).head(25)
+genre_vote_average = mean_vote_average_genre.index[:25]
+locations = genre_vote_average
+heights = mean_vote_average_genre
+plt.bar(locations, heights  )
+plt.title('Mean vote_average by genre')
+plt.xlabel('Genres')
+plt.xticks(rotation=90)
+plt.ylabel('Mean vote_average');
+This figure shows you the best movie genre that peaple like the most
+### What genre makes best profit
+mean_profit_genre = df_gener.groupby('genre')['profit'].mean().sort_values(ascending=False).head(25)
+genre_profit = mean_profit_genre.index[:25]
+locations = genre_profit
+heights = mean_profit_genre
+plt.bar(locations, heights  )
+plt.title('Mean profit by genre')
+plt.xlabel('Genres')
+plt.xticks(rotation=90)
+plt.ylabel('Mean profit');
+If you want to make the best profit you should chose the right type of the movie
+<a id='conclusions'></a>
+## Conclusions
+
+There are many properties about movies that make them unique and and  to make another successful movie i analysed this data set that contains thousands of moviesto identify the main variables to make the best decisions like (decide the type of the movie ,chose the cast , chose the director , elt) 
+
+I initially checked the properties of the data set and the properties of the data columns to determine the existing problems and found the following: -
+1 - The data set consists of (18066) rows representing the data and (21) columns representing the characteristics of the data.
+---------------------------------------------------------------------------------------- ---------------------
+
+2 - There are many columns that I see as unimportant to the data analysis process, such as (budget
+ (revenue , tagline , keywords , homepage , overview , release_date
+
+** Therefore, I deleted those columns that are not important to the analysis process
+---------------------------------------------------------------------------------------- ---------------------
+3 - There are duplicate data for (1 movie).
+
+** I deleted the duplicate data to improve the quality of the analysis.
+------------------------------------------------------------------------------------------ -------------------
+
+4 - The column data ( imdb_id ) is incorrect as it contains two letters ( tt ) next to the number, which I will not be able to use in searches and analysis.
+
+** I corrected the existing data by deleting the letters and making the data contain the correct number only)
+---------------------------------------------------------------------------------------------- ---------------
+
+5 - Column (imdb_id) contains (10) missing data representing about (0.09%), which is a percentage that does not affect the result of the analysis.
+
+** I did a search through (IMDB) Package Package to find the missing data to achieve the best possible quality of the analysis process)
+------------------------------------------------------------------------------------------------- ------------
+
+6- The cast column contains (76) missing data, representing about (0.7%), which is a percentage that does not affect the result of the analysis much.
+
+** I did a search through (IMDB) Package to find the missing data to achieve the best possible quality of the analysis process)
+----------------------------------------------------------------------------------------------- --------------
+
+7- The (director) column contains (44) missing data representing about (0.4%), which is a percentage that does not affect the result of the analysis much.
+
+** I did a search through (IMDB) Package to find the missing data to achieve the best possible quality of the analysis process)
+----------------------------------------------------------------------------------------------- --------------
+
+8 - The (genres) column contains (23) missing data representing about (0.2%), which is a percentage that does not affect the result of the analysis much.
+
+** I did a search through (IMDB) Package to find the missing data to achieve the best possible quality of the analysis process)
+------------------------------------------------------------------------------------------------- ------------
+
+9- The (genres) column data is a text separating each gener with a sign ( | ), which will not enable me to analyze the data according to each gener.
+
+** I converted the data to a list containing each separate genre and then created a new data set containing the data for each movie containing only one genre to facilitate the analysis process
+---------------------------------------------------------------------------------------------------- ---------
+
+10 - The (genres) column contains (1030) missing data representing about (9.5%), which is a percentage that greatly affects the result of the analysis.
+
+** I did a search through (IMDB) to find the missing data to achieve the best possible quality of the analysis process)
+---------------------------------------------------------------------------------------------------- ---------
+11 - Then I finally did the analysis process and find the relationships between many variables to determine the best quality of film and director to achieve the best possible profit, but there is still a lot of information that you can also search and find the relationship between them so that you can make the best possible decision
+from subprocess import call
+call(['python', '-m', 'nbconvert', 'Investigate_a_Dataset.ipynb'])
+import os
+
+os.system('Investigate_a_Dataset.ipynb')
+! jupyter nbconvert Investigate_a_Dataset.ipynb --to html
